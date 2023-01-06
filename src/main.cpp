@@ -21,7 +21,7 @@ void sendKeepAliveMessage(void);
 void sendConfigMessage(void);
 void sendStatusMessage(void);
 
-const String firmware{"1.0"};
+const String firmware{"1.1"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -353,8 +353,8 @@ void sendConfigMessage()
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   json["name"] = deviceName;
   json["unit"] = 1;
-  json["type"] = getValueName(HACT_SWITCH);
-  json["class"] = getValueName(HASWDC_SWITCH);
+  json["type"] = HACT_SWITCH;
+  json["class"] = HASWDC_SWITCH;
   json["reverse"] = "false";
   char buffer[sizeof(esp_now_payload_data_t::message)]{0};
   serializeJsonPretty(json, buffer);
