@@ -172,6 +172,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   if (incomingData.payloadsType == ENPT_UPDATE)
   {
     WiFi.softAP(("ESP-NOW Switch " + myNet.getNodeMac()).c_str(), "12345678", 1, 0);
+    webServer.begin();
     apModeHideTimer.once(300, apModeHideTimerCallback);
   }
   if (incomingData.payloadsType == ENPT_RESTART)
@@ -288,7 +289,7 @@ void setupWebServer()
 void IRAM_ATTR buttonInterrupt()
 {
   ETS_GPIO_INTR_DISABLE();
-  buttonInterruptTimer.once_ms(50, switchingRelay); // For prevent contact chatter.
+  buttonInterruptTimer.once_ms(100, switchingRelay); // For prevent contact chatter.
 }
 
 void switchingRelay()
@@ -395,6 +396,7 @@ void gatewayAvailabilityCheckTimerCallback()
 void apModeHideTimerCallback()
 {
   WiFi.softAP(("ESP-NOW Switch " + myNet.getNodeMac()).c_str(), "12345678", 1, 1);
+  webServer.end();
 }
 
 void attributesMessageTimerCallback()

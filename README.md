@@ -19,7 +19,7 @@ ESP-NOW based switch for ESP8266. Alternate firmware for Tuya/SmartLife WiFi swi
 
 ## Tested on
 
-Coming soon.
+See [here](https://github.com/aZholtikov/ESP-NOW-Switch/tree/main/hardware).
 
 ## Attention
 
