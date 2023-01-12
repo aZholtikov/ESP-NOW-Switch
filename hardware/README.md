@@ -9,4 +9,4 @@
 ```
 
 2. AUBESS 1CH 16A (Coming soon)
-3. LIGHT E27 ADAPTER (Coming soon)
+3. LIGHT E27 SOCKET (Coming soon)

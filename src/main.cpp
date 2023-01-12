@@ -21,11 +21,11 @@ void sendKeepAliveMessage(void);
 void sendConfigMessage(void);
 void sendStatusMessage(void);
 
-const String firmware{"1.1"};
+const String firmware{"1.11"};
 
 String espnowNetName{"DEFAULT"};
 
-String deviceName{"ESP-NOW switch"};
+String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
 
 bool relayStatus{false};
 uint8_t relayPin{0};
@@ -40,6 +40,9 @@ uint8_t ledPinType{0};
 bool wasMqttAvailable{false};
 
 uint8_t gatewayMAC[6]{0};
+
+const String payloadOn{"ON"};
+const String payloadOff{"OFF"};
 
 ZHNetwork myNet;
 AsyncWebServer webServer(80);
@@ -103,7 +106,7 @@ void setup()
   myNet.setOnConfirmReceivingCallback(onConfirmReceiving);
 
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(("ESP-NOW Switch " + myNet.getNodeMac()).c_str(), "12345678", 1, 0);
+  WiFi.softAP(("ESP-NOW switch " + String(ESP.getChipId(), HEX)).c_str(), "12345678", 1, 0);
   apModeHideTimer.once(300, apModeHideTimerCallback);
 
   setupWebServer();
@@ -161,7 +164,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   if (incomingData.payloadsType == ENPT_SET)
   {
     deserializeJson(json, incomingData.message);
-    relayStatus = json["set"] == "ON" ? true : false;
+    relayStatus = json["set"] == payloadOn ? true : false;
     if (relayPin)
       digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
     if (ledPin)
@@ -171,7 +174,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   }
   if (incomingData.payloadsType == ENPT_UPDATE)
   {
-    WiFi.softAP(("ESP-NOW Switch " + myNet.getNodeMac()).c_str(), "12345678", 1, 0);
+    WiFi.softAP(("ESP-NOW switch " + String(ESP.getChipId(), HEX)).c_str(), "12345678", 1, 0);
     webServer.begin();
     apModeHideTimer.once(300, apModeHideTimerCallback);
   }
@@ -315,7 +318,7 @@ void sendAttributesMessage()
   uint32_t days = hours / 24;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_ATTRIBUTES};
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
-  json["Type"] = "ESP-NOW Switch";
+  json["Type"] = "ESP-NOW switch";
   json["MCU"] = "ESP8266";
   json["MAC"] = myNet.getNodeMac();
   json["Firmware"] = firmware;
@@ -356,7 +359,8 @@ void sendConfigMessage()
   json["unit"] = 1;
   json["type"] = HACT_SWITCH;
   json["class"] = HASWDC_SWITCH;
-  json["reverse"] = "false";
+  json["payload_on"] = payloadOn;
+  json["payload_off"] = payloadOff;
   char buffer[sizeof(esp_now_payload_data_t::message)]{0};
   serializeJsonPretty(json, buffer);
   memcpy(outgoingData.message, buffer, sizeof(esp_now_payload_data_t::message));
@@ -365,7 +369,7 @@ void sendConfigMessage()
   myNet.sendUnicastMessage(temp, gatewayMAC, true);
 
   configMessageResendTimerSemaphore = true;
-  configMessageResendTimer.once(5, sendConfigMessage);
+  configMessageResendTimer.once(1, sendConfigMessage);
 }
 
 void sendStatusMessage()
@@ -375,7 +379,7 @@ void sendStatusMessage()
   statusMessageTimerSemaphore = false;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_STATE};
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
-  json["state"] = relayStatus ? "ON" : "OFF";
+  json["state"] = relayStatus ? payloadOn : payloadOff;
   char buffer[sizeof(esp_now_payload_data_t::message)]{0};
   serializeJsonPretty(json, buffer);
   memcpy(&outgoingData.message, &buffer, sizeof(esp_now_payload_data_t::message));
@@ -395,7 +399,7 @@ void gatewayAvailabilityCheckTimerCallback()
 
 void apModeHideTimerCallback()
 {
-  WiFi.softAP(("ESP-NOW Switch " + myNet.getNodeMac()).c_str(), "12345678", 1, 1);
+  WiFi.softAP(("ESP-NOW switch " + String(ESP.getChipId(), HEX)).c_str(), "12345678", 1, 1);
   webServer.end();
 }
 
