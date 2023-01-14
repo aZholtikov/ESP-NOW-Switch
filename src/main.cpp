@@ -7,7 +7,7 @@
 
 void onBroadcastReceiving(const char *data, const uint8_t *sender);
 void onUnicastReceiving(const char *data, const uint8_t *sender);
-void onConfirmReceiving(const uint8_t *target, const bool status);
+void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool status);
 
 void loadConfig(void);
 void saveConfig(void);
@@ -21,7 +21,15 @@ void sendKeepAliveMessage(void);
 void sendConfigMessage(void);
 void sendStatusMessage(void);
 
-const String firmware{"1.11"};
+typedef struct
+{
+  uint16_t id{0};
+  char message[200]{0};
+} espnow_message_t;
+
+std::vector<espnow_message_t> espnowMessage;
+
+const String firmware{"1.12"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -59,23 +67,14 @@ void apModeHideTimerCallback(void);
 Ticker attributesMessageTimer;
 bool attributesMessageTimerSemaphore{true};
 void attributesMessageTimerCallback(void);
-Ticker attributesMessageResendTimer;
-bool attributesMessageResendTimerSemaphore{false};
 
 Ticker keepAliveMessageTimer;
 bool keepAliveMessageTimerSemaphore{true};
 void keepAliveMessageTimerCallback(void);
-Ticker keepAliveMessageResendTimer;
-bool keepAliveMessageResendTimerSemaphore{false};
-
-Ticker configMessageResendTimer;
-bool configMessageResendTimerSemaphore{false};
 
 Ticker statusMessageTimer;
 bool statusMessageTimerSemaphore{true};
 void statusMessageTimerCallback(void);
-Ticker statusMessageResendTimer;
-bool statusMessageResendTimerSemaphore{false};
 
 void setup()
 {
@@ -137,7 +136,7 @@ void onBroadcastReceiving(const char *data, const uint8_t *sender)
   if (incomingData.deviceType != ENDT_GATEWAY)
     return;
   if (myNet.macToString(gatewayMAC) != myNet.macToString(sender) && incomingData.payloadsType == ENPT_KEEP_ALIVE)
-    memcpy(gatewayMAC, sender, 6);
+    memcpy(&gatewayMAC, sender, 6);
   if (myNet.macToString(gatewayMAC) == myNet.macToString(sender) && incomingData.payloadsType == ENPT_KEEP_ALIVE)
   {
     isGatewayAvailable = true;
@@ -182,30 +181,19 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
     ESP.restart();
 }
 
-void onConfirmReceiving(const uint8_t *target, const bool status)
+void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool status)
 {
-  if (status)
+  for (uint16_t i{0}; i < espnowMessage.size(); ++i)
   {
-    if (attributesMessageResendTimerSemaphore)
-    {
-      attributesMessageResendTimerSemaphore = false;
-      attributesMessageResendTimer.detach();
-    }
-    if (keepAliveMessageResendTimerSemaphore)
-    {
-      keepAliveMessageResendTimerSemaphore = false;
-      keepAliveMessageResendTimer.detach();
-    }
-    if (configMessageResendTimerSemaphore)
-    {
-      configMessageResendTimerSemaphore = false;
-      configMessageResendTimer.detach();
-    }
-    if (statusMessageResendTimerSemaphore)
-    {
-      statusMessageResendTimerSemaphore = false;
-      statusMessageResendTimer.detach();
-    }
+    espnow_message_t message = espnowMessage[i];
+    if (message.id == id)
+      if (status)
+        espnowMessage.erase(espnowMessage.begin() + i);
+      else
+      {
+        message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
+        espnowMessage.at(i) = message;
+      }
   }
 }
 
@@ -317,6 +305,7 @@ void sendAttributesMessage()
   uint32_t hours = mins / 60;
   uint32_t days = hours / 24;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_ATTRIBUTES};
+  espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   json["Type"] = "ESP-NOW switch";
   json["MCU"] = "ESP8266";
@@ -324,15 +313,11 @@ void sendAttributesMessage()
   json["Firmware"] = firmware;
   json["Library"] = myNet.getFirmwareVersion();
   json["Uptime"] = "Days:" + String(days) + " Hours:" + String(hours - (days * 24)) + " Mins:" + String(mins - (hours * 60));
-  char buffer[sizeof(esp_now_payload_data_t::message)]{0};
-  serializeJsonPretty(json, buffer);
-  memcpy(outgoingData.message, buffer, sizeof(esp_now_payload_data_t::message));
-  char temp[sizeof(esp_now_payload_data_t)]{0};
-  memcpy(&temp, &outgoingData, sizeof(esp_now_payload_data_t));
-  myNet.sendUnicastMessage(temp, gatewayMAC, true);
+  serializeJsonPretty(json, outgoingData.message);
+  memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
+  message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
 
-  attributesMessageResendTimerSemaphore = true;
-  attributesMessageResendTimer.once(1, sendAttributesMessage);
+  espnowMessage.push_back(message);
 }
 
 void sendKeepAliveMessage()
@@ -341,12 +326,11 @@ void sendKeepAliveMessage()
     return;
   keepAliveMessageTimerSemaphore = false;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_KEEP_ALIVE};
-  char temp[sizeof(esp_now_payload_data_t)]{0};
-  memcpy(&temp, &outgoingData, sizeof(esp_now_payload_data_t));
-  myNet.sendUnicastMessage(temp, gatewayMAC, true);
+  espnow_message_t message;
+  memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
+  message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
 
-  keepAliveMessageResendTimerSemaphore = true;
-  keepAliveMessageResendTimer.once(1, sendKeepAliveMessage);
+  espnowMessage.push_back(message);
 }
 
 void sendConfigMessage()
@@ -354,6 +338,7 @@ void sendConfigMessage()
   if (!isGatewayAvailable)
     return;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_CONFIG};
+  espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   json["name"] = deviceName;
   json["unit"] = 1;
@@ -361,15 +346,11 @@ void sendConfigMessage()
   json["class"] = HASWDC_SWITCH;
   json["payload_on"] = payloadOn;
   json["payload_off"] = payloadOff;
-  char buffer[sizeof(esp_now_payload_data_t::message)]{0};
-  serializeJsonPretty(json, buffer);
-  memcpy(outgoingData.message, buffer, sizeof(esp_now_payload_data_t::message));
-  char temp[sizeof(esp_now_payload_data_t)]{0};
-  memcpy(&temp, &outgoingData, sizeof(esp_now_payload_data_t));
-  myNet.sendUnicastMessage(temp, gatewayMAC, true);
+  serializeJsonPretty(json, outgoingData.message);
+  memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
+  message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
 
-  configMessageResendTimerSemaphore = true;
-  configMessageResendTimer.once(1, sendConfigMessage);
+  espnowMessage.push_back(message);
 }
 
 void sendStatusMessage()
@@ -378,23 +359,21 @@ void sendStatusMessage()
     return;
   statusMessageTimerSemaphore = false;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_STATE};
+  espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   json["state"] = relayStatus ? payloadOn : payloadOff;
-  char buffer[sizeof(esp_now_payload_data_t::message)]{0};
-  serializeJsonPretty(json, buffer);
-  memcpy(&outgoingData.message, &buffer, sizeof(esp_now_payload_data_t::message));
-  char temp[sizeof(esp_now_payload_data_t)]{0};
-  memcpy(&temp, &outgoingData, sizeof(esp_now_payload_data_t));
-  myNet.sendUnicastMessage(temp, gatewayMAC, true);
+  serializeJsonPretty(json, outgoingData.message);
+  memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
+  message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
 
-  statusMessageResendTimerSemaphore = true;
-  statusMessageResendTimer.once(1, sendStatusMessage);
+  espnowMessage.push_back(message);
 }
 
 void gatewayAvailabilityCheckTimerCallback()
 {
   isGatewayAvailable = false;
-  memset(gatewayMAC, 0, 6);
+  memset(&gatewayMAC, 0, 6);
+  espnowMessage.clear();
 }
 
 void apModeHideTimerCallback()
