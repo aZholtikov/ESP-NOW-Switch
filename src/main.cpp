@@ -29,7 +29,7 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.12"};
+const String firmware{"1.13"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -344,6 +344,7 @@ void sendConfigMessage()
   json["unit"] = 1;
   json["type"] = HACT_SWITCH;
   json["class"] = HASWDC_SWITCH;
+  json["template"] = "state";
   json["payload_on"] = payloadOn;
   json["payload_off"] = payloadOff;
   serializeJsonPretty(json, outgoingData.message);
