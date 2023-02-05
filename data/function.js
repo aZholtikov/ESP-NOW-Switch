@@ -37,6 +37,8 @@ function loadBlock() {
     setGpioValue('buttonPinTypeSelect', 'buttonPinType');
     setGpioValue('extButtonPinSelect', 'extButtonPin');
     setGpioValue('extButtonPinTypeSelect', 'extButtonPinType');
+    setGpioValue('sensorPinSelect', 'sensorPin');
+    setGpioValue('sensorTypeSelect', 'sensorType');
     handleServerResponse();
 }
 
@@ -67,7 +69,9 @@ function saveSetting(submit) {
         + "&buttonPin=" + getSelectValue('buttonPinSelect')
         + "&buttonPinType=" + getSelectValue('buttonPinTypeSelect')
         + "&extButtonPin=" + getSelectValue('extButtonPinSelect')
-        + "&extButtonPinType=" + getSelectValue('extButtonPinTypeSelect');
+        + "&extButtonPinType=" + getSelectValue('extButtonPinTypeSelect')
+        + "&sensorPin=" + getSelectValue('sensorPinSelect')
+        + "&sensorType=" + getSelectValue('sensorTypeSelect');
     sendRequest(submit, server);
     alert("Please restart device for changes apply.");
 }

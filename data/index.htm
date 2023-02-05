@@ -146,6 +146,37 @@
         </div>
 
         <div class="wrapper">
+            <p class="text-select">Ext sensor GPIO:</p>
+            <input id="sensorPin" value="{{sensorPin}}" hidden />
+            <input id="sensorType" value="{{sensorType}}" hidden />
+            <p><select id="sensorPinSelect">
+                    <option value="0">NONE</option>
+                    <option value="1">GPIO01</option>
+                    <option value="2">GPIO02</option>
+                    <option value="3">GPIO03</option>
+                    <option value="4">GPIO04</option>
+                    <option value="5">GPIO05</option>
+                    <option value="6">GPIO06</option>
+                    <option value="7">GPIO07</option>
+                    <option value="8">GPIO08</option>
+                    <option value="9">GPIO09</option>
+                    <option value="10">GPIO10</option>
+                    <option value="11">GPIO11</option>
+                    <option value="12">GPIO12</option>
+                    <option value="13">GPIO13</option>
+                    <option value="14">GPIO14</option>
+                    <option value="15">GPIO15</option>
+                    <option value="16">GPIO16</option>
+                </select></p>
+            <p><select id="sensorTypeSelect">
+                    <option value="0">NONE</option>
+                    <option value="1">DS18B20</option>
+                    <option value="2">DHT11</option>
+                    <option value="3">DHT22</option>
+                </select></p>
+        </div>
+
+        <div class="wrapper">
             <input class="btn" type="submit" value="Save" onclick="saveSetting(this);">
             <input class="btn" type="submit" value="Restart" onclick="restart(this);">
         </div>

@@ -1,6 +1,6 @@
 # ESP-NOW switch for ESP8266
 
-ESP-NOW based switch for ESP8266. Alternate firmware for Tuya/SmartLife WiFi switches.
+ESP-NOW based switch for ESP8266. Alternate firmware for Tuya/SmartLife/eWeLink WiFi switches.
 
 ## Features
 
@@ -10,6 +10,7 @@ ESP-NOW based switch for ESP8266. Alternate firmware for Tuya/SmartLife WiFi swi
 4. Automatically adds switch configuration to Home Assistan via MQTT discovery as a switch.
 5. Possibility firmware update over OTA (if is allows the size of the flash memory).
 6. Web interface for settings.
+7. Optionally support one external one wire digital climate sensor (DS18B20, DHT11 or DHT22) with automatically added sensor configuration to Home Assistan via MQTT discovery as a sensor. Periodically transmission sensor status (every 300 seconds) to the gateway.
   
 ## Notes
 
@@ -27,4 +28,4 @@ See [here](https://github.com/aZholtikov/ESP-NOW-Switch/tree/main/hardware).
 2. ESP-NOW network name must be set same of all another ESP-NOW devices in network.
 3. If encryption is used, the key must be set same of all another ESP-NOW devices in network.
 4. Upload the "data" folder (with web interface) into the filesystem before flashing.
-5. For using this firmware on Tuya/SmartLife WiFi switches, the WiFi module must be replaced with an ESP8266 compatible module (if necessary).
+5. For using this firmware on Tuya/SmartLife/eWeLink WiFi switches, the WiFi module must be replaced with an ESP8266 compatible module (if necessary).

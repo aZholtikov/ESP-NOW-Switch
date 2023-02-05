@@ -1,7 +1,10 @@
 #include "ArduinoJson.h"
 #include "ArduinoOTA.h"
-#include "ESPAsyncWebServer.h"
+#include "ESPAsyncWebServer.h" // https://github.com/aZholtikov/Async-Web-Server
+#include "LittleFS.h"
 #include "Ticker.h"
+#include "DallasTemperature.h"
+#include "DHTesp.h"
 #include "ZHNetwork.h"
 #include "ZHConfig.h"
 
@@ -16,10 +19,10 @@ void setupWebServer(void);
 void buttonInterrupt(void);
 void switchingRelay(void);
 
-void sendAttributesMessage(void);
+void sendAttributesMessage(const uint8_t type = ENST_NONE);
 void sendKeepAliveMessage(void);
-void sendConfigMessage(void);
-void sendStatusMessage(void);
+void sendConfigMessage(const uint8_t type = ENST_NONE);
+void sendStatusMessage(const uint8_t type = ENST_NONE);
 
 typedef struct
 {
@@ -29,7 +32,7 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.14"};
+const String firmware{"1.2"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -45,6 +48,9 @@ uint8_t extButtonPinType{0};
 uint8_t ledPin{0};
 uint8_t ledPinType{0};
 
+uint8_t sensorPin{0};
+uint8_t sensorType{0};
+
 bool wasMqttAvailable{false};
 
 uint8_t gatewayMAC[6]{0};
@@ -54,6 +60,11 @@ const String payloadOff{"OFF"};
 
 ZHNetwork myNet;
 AsyncWebServer webServer(80);
+
+OneWire oneWire;
+DallasTemperature ds18b20(&oneWire);
+
+DHTesp dht;
 
 Ticker buttonInterruptTimer;
 
@@ -78,9 +89,17 @@ void statusMessageTimerCallback(void);
 
 void setup()
 {
-  SPIFFS.begin();
+  LittleFS.begin();
 
   loadConfig();
+
+  if (sensorPin)
+  {
+    if (sensorType == ENST_DS18B20)
+      oneWire.begin(sensorPin);
+    if (sensorType == ENST_DHT11 || sensorType == ENST_DHT22)
+      dht.setup(sensorPin, DHTesp::AUTO_DETECT);
+  }
 
   if (relayPin)
   {
@@ -121,11 +140,19 @@ void setup()
 void loop()
 {
   if (attributesMessageTimerSemaphore)
+  {
     sendAttributesMessage();
+    if (sensorPin)
+      sendAttributesMessage(sensorType);
+  }
   if (keepAliveMessageTimerSemaphore)
     sendKeepAliveMessage();
   if (statusMessageTimerSemaphore)
+  {
     sendStatusMessage();
+    if (sensorPin)
+      sendStatusMessage(sensorType);
+  }
   myNet.maintenance();
   ArduinoOTA.handle();
 }
@@ -148,7 +175,11 @@ void onBroadcastReceiving(const char *data, const uint8_t *sender)
     {
       wasMqttAvailable = temp;
       if (temp)
+      {
         sendConfigMessage();
+        if (sensorPin)
+          sendConfigMessage(sensorType);
+      }
     }
     gatewayAvailabilityCheckTimer.once(15, gatewayAvailabilityCheckTimerCallback);
   }
@@ -188,6 +219,7 @@ void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool sta
   {
     espnow_message_t message = espnowMessage[i];
     if (message.id == id)
+    {
       if (status)
         espnowMessage.erase(espnowMessage.begin() + i);
       else
@@ -195,14 +227,15 @@ void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool sta
         message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
         espnowMessage.at(i) = message;
       }
+    }
   }
 }
 
 void loadConfig()
 {
-  if (!SPIFFS.exists("/config.json"))
+  if (!LittleFS.exists("/config.json"))
     saveConfig();
-  File file = SPIFFS.open("/config.json", "r");
+  File file = LittleFS.open("/config.json", "r");
   String jsonFile = file.readString();
   StaticJsonDocument<512> json;
   deserializeJson(json, jsonFile);
@@ -217,6 +250,8 @@ void loadConfig()
   extButtonPinType = json["extButtonPinType"];
   ledPin = json["ledPin"];
   ledPinType = json["ledPinType"];
+  sensorPin = json["sensorPin"];
+  sensorType = json["sensorType"];
   file.close();
 }
 
@@ -235,8 +270,10 @@ void saveConfig()
   json["extButtonPinType"] = extButtonPinType;
   json["ledPin"] = ledPin;
   json["ledPinType"] = ledPinType;
+  json["sensorPin"] = sensorPin;
+  json["sensorType"] = sensorType;
   json["system"] = "empty";
-  File file = SPIFFS.open("/config.json", "w");
+  File file = LittleFS.open("/config.json", "w");
   serializeJsonPretty(json, file);
   file.close();
 }
@@ -244,7 +281,7 @@ void saveConfig()
 void setupWebServer()
 {
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-               { request->send(SPIFFS, "/index.htm"); });
+               { request->send(LittleFS, "/index.htm"); });
 
   webServer.on("/setting", HTTP_GET, [](AsyncWebServerRequest *request)
                {
@@ -256,6 +293,8 @@ void setupWebServer()
         extButtonPinType = request->getParam("extButtonPinType")->value().toInt();
         ledPin = request->getParam("ledPin")->value().toInt();
         ledPinType = request->getParam("ledPinType")->value().toInt();
+        sensorPin = request->getParam("sensorPin")->value().toInt();
+        sensorType = request->getParam("sensorType")->value().toInt();
         deviceName = request->getParam("deviceName")->value();
         espnowNetName = request->getParam("espnowNetName")->value();
         request->send(200);
@@ -268,8 +307,8 @@ void setupWebServer()
 
   webServer.onNotFound([](AsyncWebServerRequest *request)
                        { 
-        if (SPIFFS.exists(request->url()))
-        request->send(SPIFFS, request->url());
+        if (LittleFS.exists(request->url()))
+        request->send(LittleFS, request->url());
         else
         {
         request->send(404, "text/plain", "File Not Found");
@@ -296,7 +335,7 @@ void switchingRelay()
   ETS_GPIO_INTR_ENABLE();
 }
 
-void sendAttributesMessage()
+void sendAttributesMessage(const uint8_t type)
 {
   if (!isGatewayAvailable)
     return;
@@ -308,7 +347,13 @@ void sendAttributesMessage()
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_ATTRIBUTES};
   espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
-  json["Type"] = "ESP-NOW switch";
+  if (type == ENST_NONE)
+    json["Type"] = "ESP-NOW switch";
+  else
+  {
+    outgoingData.deviceType = ENDT_SENSOR;
+    json["Type"] = getValueName(esp_now_sensor_type_t(type));
+  }
   json["MCU"] = "ESP8266";
   json["MAC"] = myNet.getNodeMac();
   json["Firmware"] = firmware;
@@ -334,28 +379,56 @@ void sendKeepAliveMessage()
   espnowMessage.push_back(message);
 }
 
-void sendConfigMessage()
+void sendConfigMessage(const uint8_t type)
 {
   if (!isGatewayAvailable)
     return;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_CONFIG};
   espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
-  json["name"] = deviceName;
-  json["unit"] = 1;
-  json["type"] = HACT_SWITCH;
-  json["class"] = HASWDC_SWITCH;
-  json["template"] = "state";
-  json["payload_on"] = payloadOn;
-  json["payload_off"] = payloadOff;
+  if (type == ENST_NONE)
+  {
+    json["name"] = deviceName;
+    json["unit"] = 1;
+    json["type"] = HACT_SWITCH;
+    json["class"] = HASWDC_SWITCH;
+    json["template"] = "state";
+    json["payload_on"] = payloadOn;
+    json["payload_off"] = payloadOff;
+  }
+  if (type == ENST_DS18B20 || type == ENST_DHT11 || type == ENST_DHT22)
+  {
+    outgoingData.deviceType = ENDT_SENSOR;
+    json["name"] = deviceName + " temperature";
+    json["unit"] = 2;
+    json["type"] = HACT_SENSOR;
+    json["class"] = HASDC_TEMPERATURE;
+    json["template"] = "temperature";
+  }
   serializeJsonPretty(json, outgoingData.message);
   memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
   message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
 
   espnowMessage.push_back(message);
+
+  if (type == ENST_DHT11 || type == ENST_DHT22)
+  {
+    outgoingData.deviceType = ENDT_SENSOR;
+    json["name"] = deviceName + " humidity";
+    json["unit"] = 3;
+    json["type"] = HACT_SENSOR;
+    json["class"] = HASDC_HUMIDITY;
+    json["template"] = "humidity";
+
+    serializeJsonPretty(json, outgoingData.message);
+    memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
+    message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
+
+    espnowMessage.push_back(message);
+  }
 }
 
-void sendStatusMessage()
+void sendStatusMessage(const uint8_t type)
 {
   if (!isGatewayAvailable)
     return;
@@ -363,7 +436,20 @@ void sendStatusMessage()
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_STATE};
   espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
-  json["state"] = relayStatus ? payloadOn : payloadOff;
+  if (type == ENST_NONE)
+    json["state"] = relayStatus ? payloadOn : payloadOff;
+  if (type == ENST_DS18B20)
+  {
+    outgoingData.deviceType = ENDT_SENSOR;
+    ds18b20.requestTemperatures();
+    json["temperature"] = int8_t(ds18b20.getTempCByIndex(0));
+  }
+  if (type == ENST_DHT11 || type == ENST_DHT22)
+  {
+    outgoingData.deviceType = ENDT_SENSOR;
+    json["temperature"] = int8_t(dht.getTemperature());
+    json["humidity"] = int8_t(dht.getHumidity());
+  }
   serializeJsonPretty(json, outgoingData.message);
   memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
   message.id = myNet.sendUnicastMessage(message.message, gatewayMAC, true);
