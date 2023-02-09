@@ -29,3 +29,5 @@ See [here](https://github.com/aZholtikov/ESP-NOW-Switch/tree/main/hardware).
 3. If encryption is used, the key must be set same of all another ESP-NOW devices in network.
 4. Upload the "data" folder (with web interface) into the filesystem before flashing.
 5. For using this firmware on Tuya/SmartLife/eWeLink WiFi switches, the WiFi module must be replaced with an ESP8266 compatible module (if necessary).
+
+Any feedback via [e-mail](mailto:github@zh.com.ru) would be appreciated. Or... [Buy me a coffee](https://paypal.me/aZholtikov).
