@@ -179,6 +179,12 @@ void onBroadcastReceiving(const char *data, const uint8_t *sender)
         sendConfigMessage();
         if (sensorPin)
           sendConfigMessage(sensorType);
+        sendAttributesMessage();
+        if (sensorPin)
+          sendAttributesMessage(sensorType);
+        sendStatusMessage();
+        if (sensorPin)
+          sendStatusMessage(sensorType);
       }
     }
     gatewayAvailabilityCheckTimer.once(15, gatewayAvailabilityCheckTimerCallback);
