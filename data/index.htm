@@ -30,6 +30,15 @@
         </div>
 
         <div class="wrapper">
+            <p class="text-select">Work mode:</p>
+            <input id="workMode" value="{{workMode}}" hidden />
+            <p><select id="workModeSelect">
+                    <option value="0">NORMAL</option>
+                    <option value="1">REVERSE</option>
+                </select></p>
+        </div>
+
+        <div class="wrapper">
             <p class="text-select">Relay GPIO:</p>
             <input id="relayPin" value="{{relayPin}}" hidden />
             <input id="relayPinType" value="{{relayPinType}}" hidden />

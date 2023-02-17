@@ -29,6 +29,7 @@ function loadBlock() {
     }
     document.getElementsByTagName('body')[0].innerHTML = newString;
     setFirmvareValue('version', 'firmware');
+    setGpioValue('workModeSelect', 'workMode');
     setGpioValue('relayPinSelect', 'relayPin');
     setGpioValue('relayPinTypeSelect', 'relayPinType');
     setGpioValue('ledPinSelect', 'ledPin');
@@ -71,7 +72,8 @@ function saveSetting(submit) {
         + "&extButtonPin=" + getSelectValue('extButtonPinSelect')
         + "&extButtonPinType=" + getSelectValue('extButtonPinTypeSelect')
         + "&sensorPin=" + getSelectValue('sensorPinSelect')
-        + "&sensorType=" + getSelectValue('sensorTypeSelect');
+        + "&sensorType=" + getSelectValue('sensorTypeSelect')
+        + "&workMode=" + getSelectValue('workModeSelect');
     sendRequest(submit, server);
     alert("Please restart device for changes apply.");
 }

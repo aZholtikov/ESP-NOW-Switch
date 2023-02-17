@@ -11,6 +11,7 @@ ESP-NOW based switch for ESP8266. Alternate firmware for Tuya/SmartLife/eWeLink 
 5. Possibility firmware update over OTA (if is allows the size of the flash memory).
 6. Web interface for settings.
 7. Optionally support one external one wire digital climate sensor (DS18B20, DHT11 or DHT22) with automatically added sensor configuration to Home Assistan via MQTT discovery as a sensor. Periodically transmission sensor status (every 300 seconds) to the gateway.
+8. Normal or reverse relay mode (normal by default).
   
 ## Notes
 

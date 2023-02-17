@@ -32,9 +32,11 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.21"};
+const String firmware{"1.3"};
 
 String espnowNetName{"DEFAULT"};
+
+uint8_t workMode{0};
 
 String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
 
@@ -203,9 +205,19 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
     deserializeJson(json, incomingData.message);
     relayStatus = json["set"] == payloadOn ? true : false;
     if (relayPin)
-      digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+    {
+      if (workMode)
+        digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+      else
+        digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+    }
     if (ledPin)
-      digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+    {
+      if (workMode)
+        digitalWrite(ledPin, ledPinType ? !relayStatus : relayStatus);
+      else
+        digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+    }
     saveConfig();
     sendStatusMessage();
   }
@@ -258,6 +270,7 @@ void loadConfig()
   ledPinType = json["ledPinType"];
   sensorPin = json["sensorPin"];
   sensorType = json["sensorType"];
+  workMode = json["workMode"];
   file.close();
 }
 
@@ -278,6 +291,7 @@ void saveConfig()
   json["ledPinType"] = ledPinType;
   json["sensorPin"] = sensorPin;
   json["sensorType"] = sensorType;
+  json["workMode"] = workMode;
   json["system"] = "empty";
   File file = LittleFS.open("/config.json", "w");
   serializeJsonPretty(json, file);
@@ -301,6 +315,7 @@ void setupWebServer()
         ledPinType = request->getParam("ledPinType")->value().toInt();
         sensorPin = request->getParam("sensorPin")->value().toInt();
         sensorType = request->getParam("sensorType")->value().toInt();
+        workMode = request->getParam("workMode")->value().toInt();
         deviceName = request->getParam("deviceName")->value();
         espnowNetName = request->getParam("espnowNetName")->value();
         request->send(200);
@@ -333,9 +348,19 @@ void switchingRelay()
 {
   relayStatus = !relayStatus;
   if (relayPin)
-    digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+  {
+    if (workMode)
+      digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+    else
+      digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+  }
   if (ledPin)
-    digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+  {
+    if (workMode)
+      digitalWrite(ledPin, ledPinType ? !relayStatus : relayStatus);
+    else
+      digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+  }
   saveConfig();
   sendStatusMessage();
   ETS_GPIO_INTR_ENABLE();
