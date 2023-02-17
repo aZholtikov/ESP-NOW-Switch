@@ -102,7 +102,6 @@ void setup()
     if (sensorType == ENST_DHT11 || sensorType == ENST_DHT22)
       dht.setup(sensorPin, DHTesp::AUTO_DETECT);
   }
-
   if (relayPin)
   {
     pinMode(relayPin, OUTPUT);
