@@ -21,7 +21,6 @@
 
 ```text
     Relay GPIO          GPIO12      HIGH
-    Led GPIO            GPIO13      LOW
     Button GPIO         GPIO04      RISING
     Ext sensor GPIO     GPIO14      DS18B20
 ```

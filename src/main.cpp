@@ -32,7 +32,7 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.3"};
+const String firmware{"1.31"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -105,7 +105,10 @@ void setup()
   if (relayPin)
   {
     pinMode(relayPin, OUTPUT);
-    digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+    if (workMode)
+      digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+    else
+      digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
   }
   if (ledPin)
   {
