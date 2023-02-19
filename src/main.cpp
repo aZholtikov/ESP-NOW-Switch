@@ -438,7 +438,7 @@ void sendConfigMessage(const uint8_t type)
     json["class"] = HASDC_TEMPERATURE; // ha_sensor_device_class_t
     json["template"] = "temperature";  // value_template
     json["meas"] = "°C";               // unit_of_measurement
-    json["time"] = 180;                // expire_after
+    json["time"] = 900;                // expire_after
   }
   serializeJsonPretty(json, outgoingData.message);
   memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
@@ -455,7 +455,7 @@ void sendConfigMessage(const uint8_t type)
     json["class"] = HASDC_HUMIDITY; // ha_sensor_device_class_t
     json["template"] = "humidity";  // value_template
     json["meas"] = "%";             // unit_of_measurement
-    json["time"] = 180;             // expire_after
+    json["time"] = 900;             // expire_after
 
     serializeJsonPretty(json, outgoingData.message);
     memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
