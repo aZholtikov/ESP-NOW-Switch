@@ -32,7 +32,7 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.31"};
+const String firmware{"1.32"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -423,9 +423,9 @@ void sendConfigMessage(const uint8_t type)
   {
     json["name"] = deviceName;
     json["unit"] = 1;
-    json["type"] = HACT_SWITCH;
-    json["class"] = HASWDC_SWITCH;
-    json["template"] = "state";
+    json["type"] = HACT_SWITCH;    // ha_component_type_t
+    json["class"] = HASWDC_SWITCH; // ha_switch_device_class_t
+    json["template"] = "state";    // value_template
     json["payload_on"] = payloadOn;
     json["payload_off"] = payloadOff;
   }
@@ -434,9 +434,11 @@ void sendConfigMessage(const uint8_t type)
     outgoingData.deviceType = ENDT_SENSOR;
     json["name"] = deviceName + " temperature";
     json["unit"] = 2;
-    json["type"] = HACT_SENSOR;
-    json["class"] = HASDC_TEMPERATURE;
-    json["template"] = "temperature";
+    json["type"] = HACT_SENSOR;        // ha_component_type_t
+    json["class"] = HASDC_TEMPERATURE; // ha_sensor_device_class_t
+    json["template"] = "temperature";  // value_template
+    json["meas"] = "°C";               // unit_of_measurement
+    json["time"] = 180;                // expire_after
   }
   serializeJsonPretty(json, outgoingData.message);
   memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
@@ -449,9 +451,11 @@ void sendConfigMessage(const uint8_t type)
     outgoingData.deviceType = ENDT_SENSOR;
     json["name"] = deviceName + " humidity";
     json["unit"] = 3;
-    json["type"] = HACT_SENSOR;
-    json["class"] = HASDC_HUMIDITY;
-    json["template"] = "humidity";
+    json["type"] = HACT_SENSOR;     // ha_component_type_t
+    json["class"] = HASDC_HUMIDITY; // ha_sensor_device_class_t
+    json["template"] = "humidity";  // value_template
+    json["meas"] = "%";             // unit_of_measurement
+    json["time"] = 180;             // expire_after
 
     serializeJsonPretty(json, outgoingData.message);
     memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
