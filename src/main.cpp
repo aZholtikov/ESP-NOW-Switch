@@ -343,7 +343,7 @@ void setupWebServer()
 void IRAM_ATTR buttonInterrupt()
 {
   ETS_GPIO_INTR_DISABLE();
-  buttonInterruptTimer.once_ms(100, switchingRelay); // For prevent contact chatter.
+  buttonInterruptTimer.once_ms(500, switchingRelay); // For prevent contact chatter.
 }
 
 void switchingRelay()
