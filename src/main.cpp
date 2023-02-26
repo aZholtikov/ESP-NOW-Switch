@@ -251,6 +251,7 @@ void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool sta
 
 void loadConfig()
 {
+  ETS_GPIO_INTR_DISABLE();
   if (!LittleFS.exists("/config.json"))
     saveConfig();
   File file = LittleFS.open("/config.json", "r");
@@ -272,10 +273,13 @@ void loadConfig()
   sensorType = json["sensorType"];
   workMode = json["workMode"];
   file.close();
+  delay(50);
+  ETS_GPIO_INTR_ENABLE();
 }
 
 void saveConfig()
 {
+  ETS_GPIO_INTR_DISABLE();
   StaticJsonDocument<512> json;
   json["firmware"] = firmware;
   json["espnowNetName"] = espnowNetName;
@@ -296,6 +300,8 @@ void saveConfig()
   File file = LittleFS.open("/config.json", "w");
   serializeJsonPretty(json, file);
   file.close();
+  delay(50);
+  ETS_GPIO_INTR_ENABLE();
 }
 
 void setupWebServer()
@@ -346,6 +352,7 @@ void IRAM_ATTR buttonInterrupt()
 
 void switchingRelay()
 {
+  ETS_GPIO_INTR_ENABLE();
   relayStatus = !relayStatus;
   if (relayPin)
   {
@@ -363,7 +370,6 @@ void switchingRelay()
   }
   saveConfig();
   sendStatusMessage();
-  ETS_GPIO_INTR_ENABLE();
 }
 
 void sendAttributesMessage(const uint8_t type)
