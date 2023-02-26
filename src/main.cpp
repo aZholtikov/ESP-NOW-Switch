@@ -32,7 +32,7 @@ typedef struct
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.32"};
+const String firmware{"1.4"};
 
 String espnowNetName{"DEFAULT"};
 
@@ -40,7 +40,6 @@ uint8_t workMode{0};
 
 String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
 
-bool relayStatus{false};
 uint8_t relayPin{0};
 uint8_t relayPinType{1};
 uint8_t buttonPin{0};
@@ -53,12 +52,11 @@ uint8_t ledPinType{0};
 uint8_t sensorPin{0};
 uint8_t sensorType{0};
 
+bool relayStatus{false};
+
 bool wasMqttAvailable{false};
 
 uint8_t gatewayMAC[6]{0};
-
-const String payloadOn{"ON"};
-const String payloadOff{"OFF"};
 
 ZHNetwork myNet;
 AsyncWebServer webServer(80);
@@ -205,7 +203,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   if (incomingData.payloadsType == ENPT_SET)
   {
     deserializeJson(json, incomingData.message);
-    relayStatus = json["set"] == payloadOn ? true : false;
+    relayStatus = json["set"] == "ON" ? true : false;
     if (relayPin)
     {
       if (workMode)
@@ -421,24 +419,22 @@ void sendConfigMessage(const uint8_t type)
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   if (type == ENST_NONE)
   {
-    json["name"] = deviceName;
-    json["unit"] = 1;
-    json["type"] = HACT_SWITCH;    // ha_component_type_t
-    json["class"] = HASWDC_SWITCH; // ha_switch_device_class_t
-    json["template"] = "state";    // value_template
-    json["payload_on"] = payloadOn;
-    json["payload_off"] = payloadOff;
+    json[MCMT_DEVICE_NAME] = deviceName;
+    json[MCMT_DEVICE_UNIT] = 1;
+    json[MCMT_COMPONENT_TYPE] = HACT_SWITCH;
+    json[MCMT_DEVICE_CLASS] = HASWDC_SWITCH;
+    json[MCMT_VALUE_TEMPLATE] = "state";
   }
   if (type == ENST_DS18B20 || type == ENST_DHT11 || type == ENST_DHT22)
   {
     outgoingData.deviceType = ENDT_SENSOR;
-    json["name"] = deviceName + " temperature";
-    json["unit"] = 2;
-    json["type"] = HACT_SENSOR;        // ha_component_type_t
-    json["class"] = HASDC_TEMPERATURE; // ha_sensor_device_class_t
-    json["template"] = "temperature";  // value_template
-    json["meas"] = "°C";               // unit_of_measurement
-    json["time"] = 900;                // expire_after
+    json[MCMT_DEVICE_NAME] = deviceName + " temperature";
+    json[MCMT_DEVICE_UNIT] = 2;
+    json[MCMT_COMPONENT_TYPE] = HACT_SENSOR;
+    json[MCMT_DEVICE_CLASS] = HASDC_TEMPERATURE;
+    json[MCMT_VALUE_TEMPLATE] = "temperature";
+    json[MCMT_UNIT_OF_MEASUREMENT] = "°C";
+    json[MCMT_EXPIRE_AFTER] = 900;
   }
   serializeJsonPretty(json, outgoingData.message);
   memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
@@ -449,13 +445,13 @@ void sendConfigMessage(const uint8_t type)
   if (type == ENST_DHT11 || type == ENST_DHT22)
   {
     outgoingData.deviceType = ENDT_SENSOR;
-    json["name"] = deviceName + " humidity";
-    json["unit"] = 3;
-    json["type"] = HACT_SENSOR;     // ha_component_type_t
-    json["class"] = HASDC_HUMIDITY; // ha_sensor_device_class_t
-    json["template"] = "humidity";  // value_template
-    json["meas"] = "%";             // unit_of_measurement
-    json["time"] = 900;             // expire_after
+    json[MCMT_DEVICE_NAME] = deviceName + " humidity";
+    json[MCMT_DEVICE_UNIT] = 3;
+    json[MCMT_COMPONENT_TYPE] = HACT_SENSOR;
+    json[MCMT_DEVICE_CLASS] = HASDC_HUMIDITY;
+    json[MCMT_VALUE_TEMPLATE] = "humidity";
+    json[MCMT_UNIT_OF_MEASUREMENT] = "%";
+    json[MCMT_EXPIRE_AFTER] = 900;
 
     serializeJsonPretty(json, outgoingData.message);
     memcpy(&message.message, &outgoingData, sizeof(esp_now_payload_data_t));
@@ -474,7 +470,7 @@ void sendStatusMessage(const uint8_t type)
   espnow_message_t message;
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   if (type == ENST_NONE)
-    json["state"] = relayStatus ? payloadOn : payloadOff;
+    json["state"] = relayStatus ? "ON" : "OFF";
   if (type == ENST_DS18B20)
   {
     outgoingData.deviceType = ENDT_SENSOR;
