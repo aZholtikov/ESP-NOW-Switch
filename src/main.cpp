@@ -289,7 +289,7 @@ void loadStatus(void)
   String jsonFile = file.readString();
   DynamicJsonDocument json(32);
   deserializeJson(json, jsonFile);
-  relayStatus = json["relayStatus"];
+  relayStatus = json["status"];
   file.close();
   delay(50);
   ETS_GPIO_INTR_ENABLE();
@@ -299,7 +299,7 @@ void saveStatus(void)
 {
   ETS_GPIO_INTR_DISABLE();
   DynamicJsonDocument json(32);
-  json["relayStatus"] = relayStatus;
+  json["status"] = relayStatus;
   json["system"] = "empty";
   File file = LittleFS.open("/status.json", "w");
   serializeJsonPretty(json, file);
