@@ -172,7 +172,7 @@ void onBroadcastReceiving(const char *data, const uint8_t *sender)
   if (myNet.macToString(gatewayMAC) == myNet.macToString(sender) && incomingData.payloadsType == ENPT_KEEP_ALIVE)
   {
     isGatewayAvailable = true;
-    StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
+    DynamicJsonDocument json(sizeof(esp_now_payload_data_t::message));
     deserializeJson(json, incomingData.message);
     bool temp = json["MQTT"] == "online" ? true : false;
     if (wasMqttAvailable != temp)
@@ -201,7 +201,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   memcpy(&incomingData, data, sizeof(esp_now_payload_data_t));
   if (incomingData.deviceType != ENDT_GATEWAY || myNet.macToString(gatewayMAC) != myNet.macToString(sender))
     return;
-  StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
+  DynamicJsonDocument json(sizeof(esp_now_payload_data_t::message));
   if (incomingData.payloadsType == ENPT_SET)
   {
     deserializeJson(json, incomingData.message);
@@ -407,7 +407,7 @@ void sendAttributesMessage(const uint8_t type)
   uint32_t days = hours / 24;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_ATTRIBUTES};
   espnow_message_t message;
-  StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
+  DynamicJsonDocument json(sizeof(esp_now_payload_data_t::message));
   if (type == ENST_NONE)
     json["Type"] = "ESP-NOW switch";
   else
@@ -446,7 +446,7 @@ void sendConfigMessage(const uint8_t type)
     return;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_CONFIG};
   espnow_message_t message;
-  StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
+  DynamicJsonDocument json(sizeof(esp_now_payload_data_t::message));
   if (type == ENST_NONE)
   {
     json[MCMT_DEVICE_NAME] = config.deviceName;
@@ -498,7 +498,7 @@ void sendStatusMessage(const uint8_t type)
   statusMessageTimerSemaphore = false;
   esp_now_payload_data_t outgoingData{ENDT_SWITCH, ENPT_STATE};
   espnow_message_t message;
-  StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
+  DynamicJsonDocument json(sizeof(esp_now_payload_data_t::message));
   if (type == ENST_NONE)
     json["state"] = relayStatus ? "ON" : "OFF";
   if (type == ENST_DS18B20)
