@@ -2,6 +2,7 @@
 #include "ArduinoOTA.h"
 #include "ESPAsyncWebServer.h" // https://github.com/aZholtikov/Async-Web-Server
 #include "LittleFS.h"
+#include "EEPROM.h"
 #include "Ticker.h"
 #include "DallasTemperature.h"
 #include "DHTesp.h"
@@ -14,6 +15,8 @@ void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool sta
 
 void loadConfig(void);
 void saveConfig(void);
+void loadStatus(void);
+void saveStatus(void);
 void setupWebServer(void);
 
 void buttonInterrupt(void);
@@ -30,27 +33,25 @@ typedef struct
   char message[200]{0};
 } espnow_message_t;
 
+struct deviceConfig
+{
+  const String firmware{"1.41"};
+  String espnowNetName{"DEFAULT"};
+  uint8_t workMode{0};
+  String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
+  uint8_t relayPin{0};
+  uint8_t relayPinType{1};
+  uint8_t buttonPin{0};
+  uint8_t buttonPinType{0};
+  uint8_t extButtonPin{0};
+  uint8_t extButtonPinType{0};
+  uint8_t ledPin{0};
+  uint8_t ledPinType{0};
+  uint8_t sensorPin{0};
+  uint8_t sensorType{0};
+} config;
+
 std::vector<espnow_message_t> espnowMessage;
-
-const String firmware{"1.4"};
-
-String espnowNetName{"DEFAULT"};
-
-uint8_t workMode{0};
-
-String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
-
-uint8_t relayPin{0};
-uint8_t relayPinType{1};
-uint8_t buttonPin{0};
-uint8_t buttonPinType{0};
-uint8_t extButtonPin{0};
-uint8_t extButtonPinType{0};
-uint8_t ledPin{0};
-uint8_t ledPinType{0};
-
-uint8_t sensorPin{0};
-uint8_t sensorType{0};
 
 bool relayStatus{false};
 
@@ -92,34 +93,35 @@ void setup()
   LittleFS.begin();
 
   loadConfig();
+  loadStatus();
 
-  if (sensorPin)
+  if (config.sensorPin)
   {
-    if (sensorType == ENST_DS18B20)
-      oneWire.begin(sensorPin);
-    if (sensorType == ENST_DHT11 || sensorType == ENST_DHT22)
-      dht.setup(sensorPin, DHTesp::AUTO_DETECT);
+    if (config.sensorType == ENST_DS18B20)
+      oneWire.begin(config.sensorPin);
+    if (config.sensorType == ENST_DHT11 || config.sensorType == ENST_DHT22)
+      dht.setup(config.sensorPin, DHTesp::AUTO_DETECT);
   }
-  if (relayPin)
+  if (config.relayPin)
   {
-    pinMode(relayPin, OUTPUT);
-    if (workMode)
-      digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+    pinMode(config.relayPin, OUTPUT);
+    if (config.workMode)
+      digitalWrite(config.relayPin, config.relayPinType ? !relayStatus : relayStatus);
     else
-      digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+      digitalWrite(config.relayPin, config.relayPinType ? relayStatus : !relayStatus);
   }
-  if (ledPin)
+  if (config.ledPin)
   {
-    pinMode(ledPin, OUTPUT);
-    digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+    pinMode(config.ledPin, OUTPUT);
+    digitalWrite(config.ledPin, config.ledPinType ? relayStatus : !relayStatus);
   }
-  if (buttonPin)
-    attachInterrupt(buttonPin, buttonInterrupt, buttonPinType ? RISING : FALLING);
-  if (extButtonPin)
-    attachInterrupt(extButtonPin, buttonInterrupt, extButtonPinType ? RISING : FALLING);
+  if (config.buttonPin)
+    attachInterrupt(config.buttonPin, buttonInterrupt, config.buttonPinType ? RISING : FALLING);
+  if (config.extButtonPin)
+    attachInterrupt(config.extButtonPin, buttonInterrupt, config.extButtonPinType ? RISING : FALLING);
 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  myNet.begin(espnowNetName.c_str());
+  myNet.begin(config.espnowNetName.c_str());
   // myNet.setCryptKey("VERY_LONG_CRYPT_KEY"); // If encryption is used, the key must be set same of all another ESP-NOW devices in network.
 
   myNet.setOnBroadcastReceivingCallback(onBroadcastReceiving);
@@ -144,16 +146,16 @@ void loop()
   if (attributesMessageTimerSemaphore)
   {
     sendAttributesMessage();
-    if (sensorPin)
-      sendAttributesMessage(sensorType);
+    if (config.sensorPin)
+      sendAttributesMessage(config.sensorType);
   }
   if (keepAliveMessageTimerSemaphore)
     sendKeepAliveMessage();
   if (statusMessageTimerSemaphore)
   {
     sendStatusMessage();
-    if (sensorPin)
-      sendStatusMessage(sensorType);
+    if (config.sensorPin)
+      sendStatusMessage(config.sensorType);
   }
   myNet.maintenance();
   ArduinoOTA.handle();
@@ -179,14 +181,14 @@ void onBroadcastReceiving(const char *data, const uint8_t *sender)
       if (temp)
       {
         sendConfigMessage();
-        if (sensorPin)
-          sendConfigMessage(sensorType);
+        if (config.sensorPin)
+          sendConfigMessage(config.sensorType);
         sendAttributesMessage();
-        if (sensorPin)
-          sendAttributesMessage(sensorType);
+        if (config.sensorPin)
+          sendAttributesMessage(config.sensorType);
         sendStatusMessage();
-        if (sensorPin)
-          sendStatusMessage(sensorType);
+        if (config.sensorPin)
+          sendStatusMessage(config.sensorType);
       }
     }
     gatewayAvailabilityCheckTimer.once(15, gatewayAvailabilityCheckTimerCallback);
@@ -204,19 +206,19 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
   {
     deserializeJson(json, incomingData.message);
     relayStatus = json["set"] == "ON" ? true : false;
-    if (relayPin)
+    if (config.relayPin)
     {
-      if (workMode)
-        digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+      if (config.workMode)
+        digitalWrite(config.relayPin, config.relayPinType ? !relayStatus : relayStatus);
       else
-        digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+        digitalWrite(config.relayPin, config.relayPinType ? relayStatus : !relayStatus);
     }
-    if (ledPin)
+    if (config.ledPin)
     {
-      if (workMode)
-        digitalWrite(ledPin, ledPinType ? !relayStatus : relayStatus);
+      if (config.workMode)
+        digitalWrite(config.ledPin, config.ledPinType ? !relayStatus : relayStatus);
       else
-        digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+        digitalWrite(config.ledPin, config.ledPinType ? relayStatus : !relayStatus);
     }
     saveConfig();
     sendStatusMessage();
@@ -252,27 +254,17 @@ void onConfirmReceiving(const uint8_t *target, const uint16_t id, const bool sta
 void loadConfig()
 {
   ETS_GPIO_INTR_DISABLE();
-  if (!LittleFS.exists("/config.json"))
+  EEPROM.begin(4096);
+  if (EEPROM.read(4095) == 254)
+  {
+    EEPROM.get(0, config);
+    EEPROM.end();
+  }
+  else
+  {
+    EEPROM.end();
     saveConfig();
-  File file = LittleFS.open("/config.json", "r");
-  String jsonFile = file.readString();
-  StaticJsonDocument<512> json;
-  deserializeJson(json, jsonFile);
-  espnowNetName = json["espnowNetName"].as<String>();
-  deviceName = json["deviceName"].as<String>();
-  relayStatus = json["relayStatus"];
-  relayPin = json["relayPin"];
-  relayPinType = json["relayPinType"];
-  buttonPin = json["buttonPin"];
-  buttonPinType = json["buttonPinType"];
-  extButtonPin = json["extButtonPin"];
-  extButtonPinType = json["extButtonPinType"];
-  ledPin = json["ledPin"];
-  ledPinType = json["ledPinType"];
-  sensorPin = json["sensorPin"];
-  sensorType = json["sensorType"];
-  workMode = json["workMode"];
-  file.close();
+  }
   delay(50);
   ETS_GPIO_INTR_ENABLE();
 }
@@ -280,24 +272,36 @@ void loadConfig()
 void saveConfig()
 {
   ETS_GPIO_INTR_DISABLE();
-  StaticJsonDocument<512> json;
-  json["firmware"] = firmware;
-  json["espnowNetName"] = espnowNetName;
-  json["deviceName"] = deviceName;
+  EEPROM.begin(4096);
+  EEPROM.write(4095, 254);
+  EEPROM.put(0, config);
+  EEPROM.end();
+  delay(50);
+  ETS_GPIO_INTR_ENABLE();
+}
+
+void loadStatus(void)
+{
+  ETS_GPIO_INTR_DISABLE();
+  if (!LittleFS.exists("/status.json"))
+    saveStatus();
+  File file = LittleFS.open("/status.json", "r");
+  String jsonFile = file.readString();
+  DynamicJsonDocument json(32);
+  deserializeJson(json, jsonFile);
+  relayStatus = json["relayStatus"];
+  file.close();
+  delay(50);
+  ETS_GPIO_INTR_ENABLE();
+}
+
+void saveStatus(void)
+{
+  ETS_GPIO_INTR_DISABLE();
+  DynamicJsonDocument json(32);
   json["relayStatus"] = relayStatus;
-  json["relayPin"] = relayPin;
-  json["relayPinType"] = relayPinType;
-  json["buttonPin"] = buttonPin;
-  json["buttonPinType"] = buttonPinType;
-  json["extButtonPin"] = extButtonPin;
-  json["extButtonPinType"] = extButtonPinType;
-  json["ledPin"] = ledPin;
-  json["ledPinType"] = ledPinType;
-  json["sensorPin"] = sensorPin;
-  json["sensorType"] = sensorType;
-  json["workMode"] = workMode;
   json["system"] = "empty";
-  File file = LittleFS.open("/config.json", "w");
+  File file = LittleFS.open("/status.json", "w");
   serializeJsonPretty(json, file);
   file.close();
   delay(50);
@@ -309,37 +313,57 @@ void setupWebServer()
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
                { request->send(LittleFS, "/index.htm"); });
 
+  webServer.on("/function.js", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/function.js"); });
+
+  webServer.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)
+               { request->send(LittleFS, "/style.css"); });
+
   webServer.on("/setting", HTTP_GET, [](AsyncWebServerRequest *request)
                {
-        relayPin = request->getParam("relayPin")->value().toInt();
-        relayPinType = request->getParam("relayPinType")->value().toInt();
-        buttonPin = request->getParam("buttonPin")->value().toInt();
-        buttonPinType = request->getParam("buttonPinType")->value().toInt();
-        extButtonPin = request->getParam("extButtonPin")->value().toInt();
-        extButtonPinType = request->getParam("extButtonPinType")->value().toInt();
-        ledPin = request->getParam("ledPin")->value().toInt();
-        ledPinType = request->getParam("ledPinType")->value().toInt();
-        sensorPin = request->getParam("sensorPin")->value().toInt();
-        sensorType = request->getParam("sensorType")->value().toInt();
-        workMode = request->getParam("workMode")->value().toInt();
-        deviceName = request->getParam("deviceName")->value();
-        espnowNetName = request->getParam("espnowNetName")->value();
+        config.relayPin = request->getParam("relayPin")->value().toInt();
+        config.relayPinType = request->getParam("relayPinType")->value().toInt();
+        config.buttonPin = request->getParam("buttonPin")->value().toInt();
+        config.buttonPinType = request->getParam("buttonPinType")->value().toInt();
+        config.extButtonPin = request->getParam("extButtonPin")->value().toInt();
+        config.extButtonPinType = request->getParam("extButtonPinType")->value().toInt();
+        config.ledPin = request->getParam("ledPin")->value().toInt();
+        config.ledPinType = request->getParam("ledPinType")->value().toInt();
+        config.sensorPin = request->getParam("sensorPin")->value().toInt();
+        config.sensorType = request->getParam("sensorType")->value().toInt();
+        config.workMode = request->getParam("workMode")->value().toInt();
+        config.deviceName = request->getParam("deviceName")->value();
+        config.espnowNetName = request->getParam("espnowNetName")->value();
         request->send(200);
         saveConfig(); });
 
-  webServer.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+  webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
                {
-        request->send(200);
+        String configJson;
+        DynamicJsonDocument json(512);
+        json["firmware"] = config.firmware;
+        json["espnowNetName"] = config.espnowNetName;
+        json["deviceName"] = config.deviceName;
+        json["relayPin"] = config.relayPin;
+        json["relayPinType"] = config.relayPinType;
+        json["buttonPin"] = config.buttonPin;
+        json["buttonPinType"] = config.buttonPinType;
+        json["extButtonPin"] = config.extButtonPin;
+        json["extButtonPinType"] = config.extButtonPinType;
+        json["ledPin"] = config.ledPin;
+        json["ledPinType"] = config.ledPinType;
+        json["sensorPin"] = config.sensorPin;
+        json["sensorType"] = config.sensorType;
+        json["workMode"] = config.workMode;
+        serializeJsonPretty(json, configJson);
+        request->send(200, "application/json", configJson); });
+
+  webServer.on("/restart", HTTP_GET, [](AsyncWebServerRequest *request)
+               {request->send(200);
         ESP.restart(); });
 
   webServer.onNotFound([](AsyncWebServerRequest *request)
-                       { 
-        if (LittleFS.exists(request->url()))
-        request->send(LittleFS, request->url());
-        else
-        {
-        request->send(404, "text/plain", "File Not Found");
-        } });
+                       { request->send(404, "text/plain", "File Not Found"); });
 
   webServer.begin();
 }
@@ -354,21 +378,21 @@ void switchingRelay()
 {
   ETS_GPIO_INTR_ENABLE();
   relayStatus = !relayStatus;
-  if (relayPin)
+  if (config.relayPin)
   {
-    if (workMode)
-      digitalWrite(relayPin, relayPinType ? !relayStatus : relayStatus);
+    if (config.workMode)
+      digitalWrite(config.relayPin, config.relayPinType ? !relayStatus : relayStatus);
     else
-      digitalWrite(relayPin, relayPinType ? relayStatus : !relayStatus);
+      digitalWrite(config.relayPin, config.relayPinType ? relayStatus : !relayStatus);
   }
-  if (ledPin)
+  if (config.ledPin)
   {
-    if (workMode)
-      digitalWrite(ledPin, ledPinType ? !relayStatus : relayStatus);
+    if (config.workMode)
+      digitalWrite(config.ledPin, config.ledPinType ? !relayStatus : relayStatus);
     else
-      digitalWrite(ledPin, ledPinType ? relayStatus : !relayStatus);
+      digitalWrite(config.ledPin, config.ledPinType ? relayStatus : !relayStatus);
   }
-  saveConfig();
+  saveStatus();
   sendStatusMessage();
 }
 
@@ -393,7 +417,7 @@ void sendAttributesMessage(const uint8_t type)
   }
   json["MCU"] = "ESP8266";
   json["MAC"] = myNet.getNodeMac();
-  json["Firmware"] = firmware;
+  json["Firmware"] = config.firmware;
   json["Library"] = myNet.getFirmwareVersion();
   json["Uptime"] = "Days:" + String(days) + " Hours:" + String(hours - (days * 24)) + " Mins:" + String(mins - (hours * 60));
   serializeJsonPretty(json, outgoingData.message);
@@ -425,7 +449,7 @@ void sendConfigMessage(const uint8_t type)
   StaticJsonDocument<sizeof(esp_now_payload_data_t::message)> json;
   if (type == ENST_NONE)
   {
-    json[MCMT_DEVICE_NAME] = deviceName;
+    json[MCMT_DEVICE_NAME] = config.deviceName;
     json[MCMT_DEVICE_UNIT] = 1;
     json[MCMT_COMPONENT_TYPE] = HACT_SWITCH;
     json[MCMT_DEVICE_CLASS] = HASWDC_SWITCH;
@@ -434,7 +458,7 @@ void sendConfigMessage(const uint8_t type)
   if (type == ENST_DS18B20 || type == ENST_DHT11 || type == ENST_DHT22)
   {
     outgoingData.deviceType = ENDT_SENSOR;
-    json[MCMT_DEVICE_NAME] = deviceName + " temperature";
+    json[MCMT_DEVICE_NAME] = config.deviceName + " temperature";
     json[MCMT_DEVICE_UNIT] = 2;
     json[MCMT_COMPONENT_TYPE] = HACT_SENSOR;
     json[MCMT_DEVICE_CLASS] = HASDC_TEMPERATURE;
@@ -451,7 +475,7 @@ void sendConfigMessage(const uint8_t type)
   if (type == ENST_DHT11 || type == ENST_DHT22)
   {
     outgoingData.deviceType = ENDT_SENSOR;
-    json[MCMT_DEVICE_NAME] = deviceName + " humidity";
+    json[MCMT_DEVICE_NAME] = config.deviceName + " humidity";
     json[MCMT_DEVICE_UNIT] = 3;
     json[MCMT_COMPONENT_TYPE] = HACT_SENSOR;
     json[MCMT_DEVICE_CLASS] = HASDC_HUMIDITY;
