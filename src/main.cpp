@@ -287,7 +287,7 @@ void loadStatus(void)
     saveStatus();
   File file = LittleFS.open("/status.json", "r");
   String jsonFile = file.readString();
-  DynamicJsonDocument json(32);
+  DynamicJsonDocument json(64); // To calculate the buffer size uses https://arduinojson.org/v6/assistant.
   deserializeJson(json, jsonFile);
   relayStatus = json["status"];
   file.close();
@@ -298,7 +298,7 @@ void loadStatus(void)
 void saveStatus(void)
 {
   ETS_GPIO_INTR_DISABLE();
-  DynamicJsonDocument json(32);
+  DynamicJsonDocument json(48); // To calculate the buffer size uses https://arduinojson.org/v6/assistant.
   json["status"] = relayStatus;
   json["system"] = "empty";
   File file = LittleFS.open("/status.json", "w");
@@ -340,7 +340,7 @@ void setupWebServer()
   webServer.on("/config", HTTP_GET, [](AsyncWebServerRequest *request)
                {
         String configJson;
-        DynamicJsonDocument json(512);
+        DynamicJsonDocument json(384); // To calculate the buffer size uses https://arduinojson.org/v6/assistant.
         json["firmware"] = config.firmware;
         json["espnowNetName"] = config.espnowNetName;
         json["deviceName"] = config.deviceName;
