@@ -35,7 +35,6 @@ typedef struct
 
 struct deviceConfig
 {
-  const String firmware{"1.41"};
   String espnowNetName{"DEFAULT"};
   uint8_t workMode{0};
   String deviceName = "ESP-NOW switch " + String(ESP.getChipId(), HEX);
@@ -52,6 +51,8 @@ struct deviceConfig
 } config;
 
 std::vector<espnow_message_t> espnowMessage;
+
+const String firmware{"1.41"};
 
 bool relayStatus{false};
 
@@ -341,7 +342,7 @@ void setupWebServer()
                {
         String configJson;
         DynamicJsonDocument json(384); // To calculate the buffer size uses https://arduinojson.org/v6/assistant.
-        json["firmware"] = config.firmware;
+        json["firmware"] = firmware;
         json["espnowNetName"] = config.espnowNetName;
         json["deviceName"] = config.deviceName;
         json["relayPin"] = config.relayPin;
@@ -417,7 +418,7 @@ void sendAttributesMessage(const uint8_t type)
   }
   json["MCU"] = "ESP8266";
   json["MAC"] = myNet.getNodeMac();
-  json["Firmware"] = config.firmware;
+  json["Firmware"] = firmware;
   json["Library"] = myNet.getFirmwareVersion();
   json["Uptime"] = "Days:" + String(days) + " Hours:" + String(hours - (days * 24)) + " Mins:" + String(mins - (hours * 60));
   serializeJsonPretty(json, outgoingData.message);
