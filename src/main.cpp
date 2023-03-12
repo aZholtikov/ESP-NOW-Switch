@@ -221,7 +221,7 @@ void onUnicastReceiving(const char *data, const uint8_t *sender)
       else
         digitalWrite(config.ledPin, config.ledPinType ? relayStatus : !relayStatus);
     }
-    saveConfig();
+    saveStatus();
     sendStatusMessage();
   }
   if (incomingData.payloadsType == ENPT_UPDATE)
