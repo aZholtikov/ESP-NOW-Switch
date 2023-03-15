@@ -52,7 +52,7 @@ struct deviceConfig
 
 std::vector<espnow_message_t> espnowMessage;
 
-const String firmware{"1.41"};
+const String firmware{"1.42"};
 
 bool relayStatus{false};
 
